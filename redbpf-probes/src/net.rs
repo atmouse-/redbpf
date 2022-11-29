@@ -135,6 +135,16 @@ where
             let ip = match u16::from_be((*eth).h_proto as u16) as u32 {
                 ETH_P_IP => (Ip::IPv4(self.ptr_after(eth)?)),
                 ETH_P_IPV6 => (Ip::IPv6(self.ptr_after(eth)?)),
+                ETH_P_PPP_SES => {
+                    let addr = self.data_start() as usize + mem::size_of::<ethhdr>();
+                    let ppp = self.ptr_at::<u16>(addr + 6)?;
+                    match u16::from_be((*ppp) as u16) {
+                        //pppoe header always be size 8
+                        33u16 => (Ip::IPv4(self.ptr_at::<iphdr>(addr + 8)?)),
+                        87u16 => (Ip::IPv6(self.ptr_at::<ipv6hdr>(addr + 8)?)),
+                        _ => return Err(NetworkError::NoIPHeader),
+                    }
+                },
                 _t => return Err(NetworkError::NoIPHeader),
             };
             Ok(ip)
